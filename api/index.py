@@ -34,9 +34,6 @@ def get_info():
 
 @app.route('/api/gpt', methods=['POST'])  # 修改路由
 def gpt_chat():
-    import os
-    os.environ["http_proxy"] = "http://localhost:7078"
-    os.environ["https_proxy"] = "http://localhost:7078"
     try:
         data = request.get_json()
         messages = data.get('messages', [])
