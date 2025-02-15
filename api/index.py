@@ -33,7 +33,7 @@ def get_info():
     return jsonify(SYSTEM_INFO)
 
 @app.route('/api/info', methods=['GET'])  # 修改这里
-def get_info():
+def get_info_2():
     return jsonify(SYSTEM_INFO)
 
 @app.route('/api/gpt', methods=['POST'])  # 修改路由
