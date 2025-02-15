@@ -25,6 +25,5 @@
                 { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
             ]
         }
-    ],
-    "redirects": [{ "source": "/", "destination": "/api" }]
+    ]
 }
