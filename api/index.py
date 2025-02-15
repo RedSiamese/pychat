@@ -19,13 +19,7 @@ SYSTEM_INFO = {
     "version": "1.0.0",
     "name": "Calculator API",
     "author": "wxy",
-    "description": "A simple calculator API service",
-    "endpoints": [
-        {"path": "/", "method": "GET", "description": "Welcome page"},
-        {"path": "/api", "method": "GET", "description": "Get system information"},
-        {"path": "/api/gpt", "method": "POST", "description": "Chat with GPT"},
-        {"path": "/api/deepseek", "method": "POST", "description": "Chat with DeepSeek"}
-    ]
+    "description": "A simple calculator API service"
 }
 
 # 初始化Flask应用
