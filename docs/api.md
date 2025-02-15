@@ -23,7 +23,7 @@ Welcome to Calculator API
 
 获取系统版本和可用接口信息。
 
-- **URL**: `/api/info`
+- **URL**: `/api`
 - **方法**: `GET`
 - **响应示例**:
 ```json
@@ -34,8 +34,9 @@ Welcome to Calculator API
     "description": "A simple calculator API service",
     "endpoints": [
         {"path": "/", "method": "GET", "description": "Welcome page"},
-        {"path": "/api/info", "method": "GET", "description": "Get system information"},
-        {"path": "/api/chat", "method": "POST", "description": "Chat with GPT"}
+        {"path": "/api", "method": "GET", "description": "Get system information"},
+        {"path": "/api/gpt", "method": "POST", "description": "Chat with GPT"},
+        {"path": "/api/deepseek", "method": "POST", "description": "Chat with DeepSeek"}
     ]
 }
 ```

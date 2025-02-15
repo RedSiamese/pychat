@@ -19,7 +19,7 @@ SYSTEM_INFO = {
     "description": "A simple calculator API service",
     "endpoints": [
         {"path": "/", "method": "GET", "description": "Welcome page"},
-        {"path": "/api/info", "method": "GET", "description": "Get system information"},
+        {"path": "/api", "method": "GET", "description": "Get system information"},
         {"path": "/api/gpt", "method": "POST", "description": "Chat with GPT"},
         {"path": "/api/deepseek", "method": "POST", "description": "Chat with DeepSeek"}
     ]
@@ -28,7 +28,7 @@ SYSTEM_INFO = {
 app = Flask(__name__)
 CORS(app)  # 添加这行
 
-@app.route('/api/info', methods=['GET'])
+@app.route('/api', methods=['GET'])  # 修改这里
 def get_info():
     return jsonify(SYSTEM_INFO)
 

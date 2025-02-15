@@ -61,7 +61,7 @@ python api/index.py
 
 ### 获取系统信息
 - 方法: `GET`
-- 路径: `/api/info`
+- 路径: `/api`
 - 响应示例:
 ```json
 {
