@@ -5,6 +5,12 @@ from dotenv import load_dotenv
 import os
 import openai
 import httpx
+import sys
+
+# 添加项目根目录到 Python 路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from extensions.message_processor import process_messages
 
 # 加载环境变量
 load_dotenv()  # 加载环境变量
@@ -42,22 +48,25 @@ def gpt_chat():
 
         messages = data['messages']
 
+        # 处理消息
+        processed_messages = process_messages(messages)
+        
         # 修改这里：正确设置代理
-        # proxy = "http://127.0.0.1:7078"
-        # http_client = httpx.Client(proxies={"http://": proxy, "https://": proxy})
+        proxy = "http://127.0.0.1:7078"
+        http_client = httpx.Client(proxies={"http://": proxy, "https://": proxy})
 
         openai_client = openai.OpenAI(
             api_key=OPENAI_API_KEY,
-            # http_client=http_client
+            http_client=http_client
         )
         
         # 定义流式响应生成器
         def generate():
             try:
-                # 调用OpenAI API并处理流式响应
+                # 使用处理后的消息调用OpenAI API
                 response = openai_client.chat.completions.create(
                     model="gpt-4o-mini",
-                    messages=messages,
+                    messages=processed_messages,
                     stream=True  # 启用流式输出
                 )
                 
@@ -97,6 +106,9 @@ def deepseek_chat():
 
         messages = data['messages']
         
+        # 处理消息
+        processed_messages = process_messages(messages)
+        
         # 创建DeepSeek客户端实例
         deepseek_client = openai.OpenAI(
             api_key=DEEPSEEK_API_KEY,
@@ -105,10 +117,10 @@ def deepseek_chat():
         
         # 定义流式响应生成器
         def generate():
-            # 调用DeepSeek API并处理流式响应
+            # 使用处理后的消息调用DeepSeek API
             response = deepseek_client.chat.completions.create(
                 model="deepseek-chat",  # 替换为实际的模型名称
-                messages=messages,
+                messages=processed_messages,
                 stream=True
             )
             

@@ -38,9 +38,9 @@ DEEPSEEK_API_KEY=your_deepseek_api_key_here
 ```
 
 4. 启动服务
-```bash
-python api/index.py
-```
+      ```bash
+   python api/index.py
+   ```
 
 服务将在 http://localhost:3000 启动
 
