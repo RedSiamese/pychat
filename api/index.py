@@ -52,12 +52,12 @@ def gpt_chat():
         processed_messages = process_messages(messages)
         
         # 修改这里：正确设置代理
-        proxy = "http://127.0.0.1:7078"
-        http_client = httpx.Client(proxies={"http://": proxy, "https://": proxy})
+        # proxy = "http://127.0.0.1:7078"
+        # http_client = httpx.Client(proxies={"http://": proxy, "https://": proxy})
 
         openai_client = openai.OpenAI(
             api_key=OPENAI_API_KEY,
-            http_client=http_client
+            # http_client=http_client
         )
         
         # 定义流式响应生成器
