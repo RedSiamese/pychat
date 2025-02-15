@@ -3,6 +3,11 @@ from flask_cors import CORS  # 添加这行
 from dotenv import load_dotenv
 import os
 import openai
+import logging
+
+# 配置日志
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 load_dotenv()  # 加载环境变量
 
@@ -40,27 +45,41 @@ def get_info_2():
 def gpt_chat():
     try:
         data = request.get_json()
+        if not data:
+            logger.error("No JSON data received")
+            return jsonify({'error': 'No JSON data received'}), 400
+        
         messages = data.get('messages', [])
+        if not messages:
+            logger.error("No messages found in request")
+            return jsonify({'error': 'No messages provided'}), 400
+
+        logger.info(f"Received request with {len(messages)} messages")
         
         # 在函数内创建OpenAI客户端实例
         openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
         
         def generate():
-            # 使用OpenAI客户端实例调用API
-            response = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages,
-                stream=True  # 启用流式输出
-            )
-            
-            # 逐块返回响应
-            for chunk in response:
-                # 更新处理逻辑以适应新的API结构
-                if chunk.choices[0].delta.content is not None:
-                    content = chunk.choices[0].delta.content
-                    # 使用SSE格式发送数据
-                    yield f"data: {content}\n\n"
-                    
+            try:
+                # 使用OpenAI客户端实例调用API
+                response = openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=messages,
+                    stream=True  # 启用流式输出
+                )
+                
+                # 逐块返回响应
+                for chunk in response:
+                    # 更新处理逻辑以适应新的API结构
+                    if chunk.choices[0].delta.content is not None:
+                        content = chunk.choices[0].delta.content
+                        # 使用SSE格式发送数据
+                        yield f"data: {content}\n\n"
+                        
+            except Exception as e:
+                logger.error(f"Error in stream generation: {str(e)}")
+                yield f"data: Error: {str(e)}\n\n"
+        
         return Response(
             stream_with_context(generate()),
             content_type='text/event-stream',
@@ -72,7 +91,10 @@ def gpt_chat():
         )
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        logger.error(f"Unexpected error in gpt_chat: {str(e)}", exc_info=True)
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/deepseek', methods=['POST'])
 def deepseek_chat():
@@ -122,4 +144,4 @@ def home():
 if __name__ == '__main__':
     import os
     debug_mode = os.environ.get('FLASK_ENV') == 'development'
-    app.run(debug=debug_mode, port=3000)
+    app.run(debug=debug_mode, port=3000, host='0.0.0.0')
