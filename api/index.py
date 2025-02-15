@@ -32,6 +32,10 @@ CORS(app)  # 添加这行
 def get_info():
     return jsonify(SYSTEM_INFO)
 
+@app.route('/api/info', methods=['GET'])  # 修改这里
+def get_info():
+    return jsonify(SYSTEM_INFO)
+
 @app.route('/api/gpt', methods=['POST'])  # 修改路由
 def gpt_chat():
     try:
