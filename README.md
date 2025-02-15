@@ -1,13 +1,13 @@
 # PyChat API
 
-一个基于 Flask 的 ChatGPT 代理 API 服务，支持流式输出。
+一个基于 Flask 的 ChatGPT 和 DeepSeek 代理 API 服务，支持流式输出。
 
 ## 功能特点
 
-- 支持 ChatGPT API 的流式输出
+- 支持 ChatGPT 和 DeepSeek API 的流式输出
 - 提供系统信息查询接口
 - 部署简单，支持 Vercel 自动部署
-- 使用 TypeScript 类型注解提供更好的代码提示
+- 使用 Flask 和 OpenAI 库构建
 
 ## 快速开始
 
@@ -15,6 +15,7 @@
 
 - Python 3.7+
 - OpenAI API Key
+- DeepSeek API Key
 
 ### 安装步骤
 
@@ -30,25 +31,11 @@ pip install -r requirements.txt
 ```
 
 3. 配置环境变量
-复制 `.env.local` 到 `.env` 并填入你的 OpenAI API Key：
+复制 `.env.local` 到 `.env` 并填入你的 API Keys：
 ```
-OPENAI_API_KEY=your_api_key_here
-```
-
-### 环境变量设置
-
-1. 复制环境变量示例文件：
-```bash
-cp .env.local .env
-```
-
-2. 编辑 .env 文件，填入你的 API Keys：
-```properties
-OPENAI_API_KEY=your_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
 DEEPSEEK_API_KEY=your_deepseek_api_key_here
 ```
-
-注意：永远不要提交 .env 文件到版本控制系统。
 
 4. 启动服务
 ```bash
@@ -93,7 +80,9 @@ python api/index.py
 ### DeepSeek 对话
 - 方法: `POST`
 - 路径: `/api/deepseek`
-- 请求体示例: 与 GPT API 相同
+- 请求体示例: 同 GPT API
+
+详细的 API 文档请参考 [API文档](docs/api.md)
 
 ### 前端集成示例
 
@@ -134,7 +123,7 @@ while (true) {
 ### Vercel 部署
 1. Fork 此项目
 2. 在 Vercel 中导入项目
-3. 设置环境变量 `OPENAI_API_KEY`
+3. 设置环境变量 `OPENAI_API_KEY` 和 `DEEPSEEK_API_KEY`
 4. 完成部署
 
 ## 许可证

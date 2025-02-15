@@ -3,19 +3,14 @@ from flask_cors import CORS  # 添加这行
 from dotenv import load_dotenv
 import os
 import openai
-import logging
 import httpx
-
-# 配置日志
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 load_dotenv()  # 加载环境变量
 
 # 配置API
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
-DEEPSEEK_API_BASE = "https://api.deepseek.com/v1"  # DeepSeek API基础URL
+DEEPSEEK_API_BASE = "https://api.deepseek.com"  # DeepSeek API基础URL
 
 # 添加系统信息常量
 SYSTEM_INFO = {
@@ -38,27 +33,24 @@ CORS(app)  # 添加这行
 def get_info():
     return jsonify(SYSTEM_INFO)
 
-@app.route('/api/info', methods=['GET'])  # 修改这里
-def get_info_2():
-    return jsonify(SYSTEM_INFO)
-
 @app.route('/api/gpt', methods=['POST'])  # 修改路由
 def gpt_chat():
     try:
         data = request.get_json()
         if not data:
-            logger.error("No JSON data received")
             return jsonify({'error': 'No JSON data received'}), 400
         
         messages = data.get('messages', [])
         if not messages:
-            logger.error("No messages found in request")
             return jsonify({'error': 'No messages provided'}), 400
-
-        logger.info(f"Received request with {len(messages)} messages")
         
+        # 修改这里：正确设置代理
+        # proxy = "http://127.0.0.1:7078"
+        # http_client = httpx.Client(proxies={"http://": proxy, "https://": proxy})
+
         openai_client = openai.OpenAI(
-            api_key=OPENAI_API_KEY
+            api_key=OPENAI_API_KEY,
+            # http_client=http_client
         )
         
         def generate():
@@ -79,7 +71,6 @@ def gpt_chat():
                         yield f"data: {content}\n\n"
                         
             except Exception as e:
-                logger.error(f"Error in stream generation: {str(e)}")
                 yield f"data: Error: {str(e)}\n\n"
         
         return Response(
@@ -93,7 +84,6 @@ def gpt_chat():
         )
     
     except Exception as e:
-        logger.error(f"Unexpected error in gpt_chat: {str(e)}", exc_info=True)
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -136,6 +126,8 @@ def deepseek_chat():
         )
     
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 400
 
 @app.route('/')
