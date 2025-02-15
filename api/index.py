@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 import openai
 import logging
+import httpx
 
 # 配置日志
 logging.basicConfig(level=logging.DEBUG)
@@ -56,8 +57,9 @@ def gpt_chat():
 
         logger.info(f"Received request with {len(messages)} messages")
         
-        # 在函数内创建OpenAI客户端实例
-        openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        openai_client = openai.OpenAI(
+            api_key=OPENAI_API_KEY
+        )
         
         def generate():
             try:
