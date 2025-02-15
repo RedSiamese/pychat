@@ -6,10 +6,28 @@
             "use": "@vercel/python"
         }
     ],
-    "rewrites": [
+    "routes": [
         {
-            "source": "/(.*)",
-            "destination": "/api/index.py"
+            "src": "/(.*)",
+            "dest": "api/index.py",
+            "headers": {
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+                "Access-Control-Allow-Headers": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version",
+                "Cache-Control": "no-cache, no-store, must-revalidate"
+            }
         }
-    ]
+    ],
+    "env": {
+        "FLASK_APP": "api/index.py",
+        "FLASK_ENV": "production",
+        "PYTHONPATH": "."
+    },
+    "functions": {
+        "api/index.py": {
+            "memory": 1024,
+            "maxDuration": 10
+        }
+    }
 }
