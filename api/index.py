@@ -6,6 +6,7 @@ import os
 import openai
 import httpx
 import sys
+import logging
 
 # 添加项目根目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,7 +44,7 @@ def gpt_chat():
     try:
         # 获取并验证请求数据
         data = request.get_json()
-        print("[debug]", data)
+        logging.log(data)
         if not data or 'messages' not in data:
             return jsonify({'error': 'Invalid request data'}), 400
 
@@ -72,9 +73,12 @@ def gpt_chat():
                 )
                 
                 for chunk in response:
-                    if chunk.choices[0].delta.content is not None:
-                        content = chunk.choices[0].delta.content
-                        yield f"data: {content}\n\n"
+                    yield f"data: {chunk.to_json()}\n\n"
+                    # if chunk.choices[0].delta.content is not None:
+                    #     content = chunk.choices[0].delta.content
+                    #     yield f"data: {content}\n\n"
+
+                yield f"data: [DONE]\n\n"
                         
             except Exception as e:
                 yield f"data: Error: {str(e)}\n\n"
@@ -102,7 +106,7 @@ def deepseek_chat():
     try:
         # 获取并验证请求数据
         data = request.get_json()
-        print("[debug]", data)
+        logging.log(data)
         if not data or 'messages' not in data:
             return jsonify({'error': 'Invalid request data'}), 400
 
@@ -127,9 +131,12 @@ def deepseek_chat():
             )
             
             for chunk in response:
-                if chunk.choices[0].delta.content is not None:
-                    content = chunk.choices[0].delta.content
-                    yield f"data: {content}\n\n"
+                yield f"data: {chunk.to_json()}\n\n"
+                # if chunk.choices[0].delta.content is not None:
+                #     content = chunk.choices[0].delta.content
+                #     yield f"data: {content}\n\n"
+            
+            yield f"data: [DONE]\n\n"
                     
         # 返回流式响应
         return Response(
