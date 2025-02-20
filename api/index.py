@@ -72,16 +72,16 @@ def gpt_chat():
                 )
                 
                 for chunk in response:
-                    resp = chunk.to_json()
+                    resp = chunk.to_dict()
                     print("[debug]", "[response]", resp)
-                    yield f"data: {resp}\n\n"
+                    info = jsonify(resp)
+                    yield f"data: {info}\n\n"
                     # if chunk.choices[0].delta.content is not None:
                     #     content = chunk.choices[0].delta.content
                     #     yield f"data: {content}\n\n"
                         
             except Exception as e:
                 print("error: ", str(e))
-                yield f"data: [DONE]\n\n"
         
         # 返回流式响应
         return Response(
@@ -132,12 +132,11 @@ def deepseek_chat():
             
             for chunk in response:
                 resp = chunk.to_json()
-                # print("[debug]", "[response]", resp)
+                print("[debug]", "[response]", resp)
                 yield f"data: {resp}\n\n"
                 # if chunk.choices[0].delta.content is not None:
                 #     content = chunk.choices[0].delta.content
                 #     yield f"data: {content}\n\n"
-            yield f"data: [DONE]\n\n"
                     
         # 返回流式响应
         return Response(
