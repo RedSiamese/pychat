@@ -43,7 +43,7 @@ def gpt_chat():
     try:
         # 获取并验证请求数据
         data = request.get_json()
-        print("[debug]", "[request]", data)
+        # print("[debug]", "[request]", data)
         if not data or 'messages' not in data:
             return jsonify({'error': 'Invalid request data'}), 400
 
@@ -78,10 +78,10 @@ def gpt_chat():
                     # if chunk.choices[0].delta.content is not None:
                     #     content = chunk.choices[0].delta.content
                     #     yield f"data: {content}\n\n"
-                yield f"data: [DONE]\n\n"
                         
             except Exception as e:
-                yield f"data: Error: {str(e)}\n\n"
+                print("error: ", str(e))
+                yield f"data: [DONE]\n\n"
         
         # 返回流式响应
         return Response(
@@ -132,7 +132,7 @@ def deepseek_chat():
             
             for chunk in response:
                 resp = chunk.to_json()
-                print("[debug]", "[response]", resp)
+                # print("[debug]", "[response]", resp)
                 yield f"data: {resp}\n\n"
                 # if chunk.choices[0].delta.content is not None:
                 #     content = chunk.choices[0].delta.content
