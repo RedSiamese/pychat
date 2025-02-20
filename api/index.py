@@ -6,6 +6,7 @@ import os
 import openai
 import httpx
 import sys
+import json
 
 # 添加项目根目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -73,7 +74,7 @@ def gpt_chat():
                 
                 for chunk in response:
                     resp = chunk.to_dict()
-                    info = jsonify(resp)
+                    info = json.dumps(resp)
                     print("[debug]", "[response]", info)
                     yield f"data: {info}\n\n"
                     # if chunk.choices[0].delta.content is not None:
