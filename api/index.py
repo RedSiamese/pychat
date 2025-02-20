@@ -125,6 +125,7 @@ def deepseek_chat():
         def generate():
             yield "data: "+'{"id": "chatcmpl-B2vAtogNfWyhRPKhEz7ZVrlpXPh3h","choices": [{"delta": {"content": "hi! ","role": "assistant","refusal": null},"finish_reason": null,"index": 0,"logprobs": null}],"created": 1740036135,"model": "gpt-4o-mini-2024-07-18","object": "chat.completion.chunk","service_tier": "default","system_fingerprint": "fp_13eed4fce1"}'
             yield "data: "+'{"id": "chatcmpl-B2vAtogNfWyhRPKhEz7ZVrlpXPh3h","choices": [{"delta": {"content": "nihao!","role": "assistant","refusal": null},"finish_reason": null,"index": 0,"logprobs": null}],"created": 1740036135,"model": "gpt-4o-mini-2024-07-18","object": "chat.completion.chunk","service_tier": "default","system_fingerprint": "fp_13eed4fce1"}'
+            yield "data: "+'{"id": "chatcmpl-B2vAtogNfWyhRPKhEz7ZVrlpXPh3h","choices": [{"delta": {"content": "nihao!","role": "assistant","refusal": null},"finish_reason": "stop","index": 0,"logprobs": null}],"created": 1740036135,"model": "gpt-4o-mini-2024-07-18","object": "chat.completion.chunk","service_tier": "default","system_fingerprint": "fp_13eed4fce1"}'
             # # 使用处理后的消息调用DeepSeek API
             # response = deepseek_client.chat.completions.create(
             #     model="deepseek-chat",  # 替换为实际的模型名称
