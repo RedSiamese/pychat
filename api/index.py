@@ -78,6 +78,7 @@ def gpt_chat():
                     # if chunk.choices[0].delta.content is not None:
                     #     content = chunk.choices[0].delta.content
                     #     yield f"data: {content}\n\n"
+                yield f"data: [DONE]\n\n"
                         
             except Exception as e:
                 yield f"data: Error: {str(e)}\n\n"
@@ -136,6 +137,7 @@ def deepseek_chat():
                 # if chunk.choices[0].delta.content is not None:
                 #     content = chunk.choices[0].delta.content
                 #     yield f"data: {content}\n\n"
+            yield f"data: [DONE]\n\n"
                     
         # 返回流式响应
         return Response(
