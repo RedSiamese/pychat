@@ -124,20 +124,18 @@ def deepseek_chat():
         
         # 定义流式响应生成器
         def generate():
-            yield "data: "+'{"id": "chatcmpl-B2vAtogNfWyhRPKhEz7ZVrlpXPh3h","choices": [{"delta": {"content": "hi! ","role": "assistant","refusal": null},"finish_reason": null,"index": 0,"logprobs": null}],"created": 1740036135,"model": "gpt-4o-mini-2024-07-18","object": "chat.completion.chunk","service_tier": "default","system_fingerprint": "fp_13eed4fce1"}'
-            yield "data: "+'{"id": "chatcmpl-B2vAtogNfWyhRPKhEz7ZVrlpXPh3h","choices": [{"delta": {"content": "nihao!","role": "assistant","refusal": null},"finish_reason": null,"index": 0,"logprobs": null}],"created": 1740036135,"model": "gpt-4o-mini-2024-07-18","object": "chat.completion.chunk","service_tier": "default","system_fingerprint": "fp_13eed4fce1"}'
-            yield "data: "+'{"id": "chatcmpl-B2vAtogNfWyhRPKhEz7ZVrlpXPh3h","choices": [{"delta": {"content": "nihao!","role": "assistant","refusal": null},"finish_reason": "stop","index": 0,"logprobs": null}],"created": 1740036135,"model": "gpt-4o-mini-2024-07-18","object": "chat.completion.chunk","service_tier": "default","system_fingerprint": "fp_13eed4fce1"}'
-            # # 使用处理后的消息调用DeepSeek API
-            # response = deepseek_client.chat.completions.create(
-            #     model="deepseek-chat",  # 替换为实际的模型名称
-            #     messages=processed_messages,
-            #     stream=True
-            # )
+            # 使用处理后的消息调用DeepSeek API
+            response = deepseek_client.chat.completions.create(
+                model="deepseek-chat",  # 替换为实际的模型名称
+                messages=processed_messages,
+                stream=True
+            )
             
-            # for chunk in response:
-            #     resp = chunk.to_json()
-            #     print("[debug]", "[response]", resp)
-            #     yield f"data: {resp}\n\n"
+            for chunk in response:
+                resp = chunk.to_dict()
+                info = json.dumps(resp)
+                print("[debug]", "[response]", info)
+                yield f"data: {info}\n\n"
                 # if chunk.choices[0].delta.content is not None:
                 #     content = chunk.choices[0].delta.content
                 #     yield f"data: {content}\n\n"
