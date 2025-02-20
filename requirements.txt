@@ -5,4 +5,4 @@ openai==1.39.0
 requests==2.31.0
 flask-cors==3.0.10
 httpx==0.25.2
-logging==0.5.1.2
+logging==0.4.9.6
