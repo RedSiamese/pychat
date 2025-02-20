@@ -6,6 +6,7 @@ import os
 import openai
 import httpx
 import sys
+import logging
 
 # 添加项目根目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -38,11 +39,12 @@ def get_info():
     return jsonify(SYSTEM_INFO)
 
 # ChatGPT API路由
-@app.route('/api/gpt', methods=['POST']) 
+@app.route('/api/gpt/v1/chat/completions', methods=['POST']) 
 def gpt_chat():
     try:
         # 获取并验证请求数据
         data = request.get_json()
+        logging.log(data)
         if not data or 'messages' not in data:
             return jsonify({'error': 'Invalid request data'}), 400
 
@@ -96,11 +98,12 @@ def gpt_chat():
         return jsonify({'error': str(e)}), 500
 
 # DeepSeek API路由
-@app.route('/api/deepseek', methods=['POST'])
+@app.route('/api/deepseek/v1/chat/completions', methods=['POST'])
 def deepseek_chat():
     try:
         # 获取并验证请求数据
         data = request.get_json()
+        logging.log(data)
         if not data or 'messages' not in data:
             return jsonify({'error': 'Invalid request data'}), 400
 
