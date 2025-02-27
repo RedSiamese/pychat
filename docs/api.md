@@ -72,7 +72,18 @@ Content-Type: application/json
 - **响应**:
   - 内容类型: `text/event-stream`
   - 格式: Server-Sent Events (SSE)
-  - 每个事件以 `data: ` 开头，后跟实际内容
+  - 每个事件以 `data: ` 开头，后跟 JSON 格式的响应数据
+  - 响应结束时会发送 `data: [DONE]`
+  - 响应示例:
+    ```
+    data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"gpt-3.5-turbo-0613","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
+
+    data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"gpt-3.5-turbo-0613","choices":[{"index":0,"delta":{"content":"!"},"finish_reason":null}]}
+
+    data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"gpt-3.5-turbo-0613","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+    data: [DONE]
+    ```
 
 ### 4. DeepSeek 对话 API
 
@@ -85,7 +96,7 @@ Content-Type: application/json
 Content-Type: application/json
 ```
 - **请求体**: 同 ChatGPT API
-- **响应**: 同 ChatGPT API
+- **响应**: 格式与 ChatGPT API 相同，包括结束时的 `[DONE]` 标记
 
 ## 错误处理
 
