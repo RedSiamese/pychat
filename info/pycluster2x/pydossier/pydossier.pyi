@@ -1391,7 +1391,7 @@ def load(path: str, cfg: dict[str, str]) -> dossier:
             ``` python
     
             dossier.save("./record/")
-            dossier:pydossier.dossier = pydossier.load("./record/")
+            dossier:pydossier.dossier = pydossier.load("./record/", pycluster.default_cfg())
             ```
             support asynchronous
     """
@@ -1415,7 +1415,7 @@ def load_big(path: str, cfg: dict[str, str]) -> dossier:
             ``` python
     
             dossier.save_big("./record/")
-            dossier_0:pydossier.dossier = pydossier.load_big("./record/")
+            dossier_0:pydossier.dossier = pydossier.load_big("./record/", pycluster.default_cfg())
             ```
             support asynchronous
     """
@@ -1439,7 +1439,7 @@ def load_small(path: str, cfg: dict[str, str]) -> dossier:
             ``` python
     
             dossier.save_small("./record/")
-            dossier:pydossier.dossier = pydossier.load_small("./record/")
+            dossier:pydossier.dossier = pydossier.load_small("./record/", pycluster.default_cfg())
             ```
             support asynchronous
     """

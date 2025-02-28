@@ -67,8 +67,6 @@ def ai_chat():
         if api_key.startswith('Bearer '):
             api_key = api_key[7:]
 
-        # print(api_key)
-
         # 获取并验证请求数据
         data = request.get_json()
         if not data or 'messages' not in data:
@@ -77,9 +75,11 @@ def ai_chat():
         model = data['model']
         messages = data['messages']
 
+        print("model",model)
         # 处理消息
         processed_messages = process_messages(messages)
         # print(messages)
+        print("processed_messages end")
         
         # 定义流式响应生成器
         def generate():
@@ -93,6 +93,8 @@ def ai_chat():
                 print("已完成用户回复")
                         
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 yield "data: [DONE]\n\n"
         
@@ -101,9 +103,8 @@ def ai_chat():
             stream_with_context(generate()),
             content_type='text/event-stream',
             headers={
-                'Cache-Control': 'no-cache',
+                'Cache-Control': 'no-cache, no-transform',
                 'X-Accel-Buffering': 'no',  # 禁用nginx缓冲
-                'Connection': 'keep-alive'
             }
         )
     
@@ -114,175 +115,40 @@ def ai_chat():
         return jsonify({'error': str(e)}), 500
 
 
-# ChatGPT API路由
-@app.route('/api/gpt/v1/chat/completions', methods=['POST']) 
-def gpt_chat():
-    try:
-        # 获取并验证请求数据
-        data = request.get_json()
-        # print("[debug]", "[request]", data)
-        if not data or 'messages' not in data:
-            return jsonify({'error': 'Invalid request data'}), 400
+# # siliconflow API路由
+# @app.route('/api/gpt/v1/chat/completions', methods=['POST']) 
+# def siliconflow_chat():
+#     try:
+#         # 获取并验证请求数据
+#         data = request.get_json()
 
-        messages = data['messages']
+#         # print(data)
+#         if not data:
+#             return jsonify({'error': 'Invalid request data'}), 400
 
-        # 处理消息
-        processed_messages = process_messages(messages)
+#         print(data)
         
-        # 定义流式响应生成器
-        def generate():
-            try:
-                # 使用处理后的消息调用OpenAI API
-                for msg in ai.gpt(processed_messages):
-                    yield f"data: {msg}\n\n"
-                
-                # 在响应结束时发送 [DONE] 标记
-                yield "data: [DONE]\n\n"
-                        
-            except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
-                yield "data: [DONE]\n\n"
         
-        # 返回流式响应
-        return Response(
-            stream_with_context(generate()),
-            content_type='text/event-stream',
-            headers={
-                'Cache-Control': 'no-cache',
-                'X-Accel-Buffering': 'no',  # 禁用nginx缓冲
-                'Connection': 'keep-alive'
-            }
-        )
-    
-    except Exception as e:
-        # 处理整体异常
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-# DeepSeek API路由
-@app.route('/api/deepseek/v1/chat/completions', methods=['POST'])
-def deepseek_chat():
-    try:
-        # 获取并验证请求数据
-        data = request.get_json()
-        print("[debug]", "[request]", data)
-        if not data or 'messages' not in data:
-            return jsonify({'error': 'Invalid request data'}), 400
-
-        messages = data['messages']
-        
-        # 处理消息
-        processed_messages = process_messages(messages)
-        
-        # 定义流式响应生成器
-        def generate():
-            for msg in ai.deepseek(processed_messages):
-                yield f"data: {msg}\n\n"
-            
-            # 在响应结束时发送 [DONE] 标记
-            yield "data: [DONE]\n\n"
+#         # 定义流式响应生成器
+#         def generate():
+#             # 在响应结束时发送 [DONE] 标记
+#             yield "data: [DONE]\n\n"
                     
-        # 返回流式响应
-        return Response(
-            stream_with_context(generate()),
-            content_type='text/event-stream',
-            headers={
-                'Cache-Control': 'no-cache',
-                'X-Accel-Buffering': 'no',
-                'Connection': 'keep-alive'
-            }
-        )
+#         # 返回流式响应
+#         return Response(
+#             stream_with_context(generate()),
+#             content_type='text/event-stream',
+#             headers={
+#                 'Cache-Control': 'no-cache, no-transform',
+#                 'X-Accel-Buffering': 'no',
+#             }
+#         )
     
-    except Exception as e:
-        # 处理整体异常
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 400
-
-
-
-# DeepSeek API路由
-@app.route('/api/tencent/v1/chat/completions', methods=['POST'])
-def tencent_chat():
-    try:
-        # 获取并验证请求数据
-        data = request.get_json()
-        if not data or 'messages' not in data:
-            return jsonify({'error': 'Invalid request data'}), 400
-
-        messages = data['messages']
-        
-        # 处理消息
-        processed_messages = process_messages(messages)
-        
-        # 定义流式响应生成器
-        def generate():
-            for msg in ai.tencent(processed_messages):
-                yield f"data: {msg}\n\n"
-            
-            # 在响应结束时发送 [DONE] 标记
-            yield "data: [DONE]\n\n"
-                    
-        # 返回流式响应
-        return Response(
-            stream_with_context(generate()),
-            content_type='text/event-stream',
-            headers={
-                'Cache-Control': 'no-cache',
-                'X-Accel-Buffering': 'no',
-                'Connection': 'keep-alive'
-            }
-        )
-    
-    except Exception as e:
-        # 处理整体异常
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 400
-
-
-# siliconflow API路由
-@app.route('/api/siliconflow/v1/chat/completions', methods=['POST'])
-def siliconflow_chat():
-    try:
-        # 获取并验证请求数据
-        data = request.get_json()
-
-        # print(data)
-        if not data or 'messages' not in data:
-            return jsonify({'error': 'Invalid request data'}), 400
-
-        messages = data['messages']
-        
-        # 处理消息
-        processed_messages = process_messages(messages)
-        
-        
-        # 定义流式响应生成器
-        def generate():
-            for msg in ai.siliconflow(processed_messages):
-                yield f"data: {msg}\n\n"
-            
-            # 在响应结束时发送 [DONE] 标记
-            yield "data: [DONE]\n\n"
-                    
-        # 返回流式响应
-        return Response(
-            stream_with_context(generate()),
-            content_type='text/event-stream',
-            headers={
-                'Cache-Control': 'no-cache',
-                'X-Accel-Buffering': 'no',
-                'Connection': 'keep-alive'
-            }
-        )
-    
-    except Exception as e:
-        # 处理整体异常
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 400
+#     except Exception as e:
+#         # 处理整体异常
+#         import traceback
+#         traceback.print_exc()
+#         return jsonify({'error': str(e)}), 400
 
 
 

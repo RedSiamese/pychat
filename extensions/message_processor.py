@@ -4,6 +4,11 @@ import os
 import importlib.util
 import sys
 
+# 添加项目根目录到 Python 路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import extensions.ai as ai
+
 def process_local_info(messages):
     """处理本地info目录下的文件，支持多个@指令和自定义规则"""
     if not messages:
@@ -39,7 +44,7 @@ def process_local_info(messages):
                     
                     # 调用规则函数
                     if hasattr(module, 'rule'):
-                        context = module.rule(messages)
+                        context = module.rule(messages, ai.tencent)
                         if context:
                             system_messages.append(f"参考文档[{info_dir}]:\n\n{context}\n\n")
                     continue

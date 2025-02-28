@@ -35,89 +35,10 @@ funcs = {
     "cluster版本管理":{"func":["demo_version","lib_version","sdk_version","doc"], "doc":None},
 }
 
-import requests,json,os
-from dotenv import load_dotenv
-# 加载环境变量
-load_dotenv()  # 加载环境变量
+import os
+import re,json
 
-# 配置API密钥和基础URL
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
-DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
-SILICONFLOW_API_KEY = os.getenv('SILICONFLOW_API_KEY', '')  # 添加硅基流动API密钥
-DEEPSEEK_API_BASE = "https://api.deepseek.com"
-SILICONFLOW_API_BASE = "https://api.siliconflow.com/v1/chat/completions"  # 修改硅基流动API基础URL
-
-def siliconflow(messages:'list[dict[str, str]]'):
-    """使用硅基流动API处理对话"""
-    
-    headers = {
-        "Authorization": f"Bearer {SILICONFLOW_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    def generate(messages):
-        try:
-            data = {
-                "model": "deepseek-ai/DeepSeek-V3",
-                "messages": messages,
-                "stream": True,
-                "temperature": 0.2
-            }
-            
-            # 使用requests发送流式请求
-            response = requests.post(
-                SILICONFLOW_API_BASE,
-                headers=headers,
-                json=data,
-                stream=True
-            )
-            
-            content = ""
-            reasoning_content = ""
-
-            def deal_response(resp:requests.Response):
-                for line in resp.iter_lines():
-                    if line:
-                        # 删除 "data: " 前缀并解析 JSON
-                        line:str = line.decode('utf-8')
-                        if line.startswith("data: "):
-                            try:
-                                yield json.loads(line[6:])
-                            except json.JSONDecodeError:
-                                continue
-                        else:
-                            print("error line:", line)
-                            continue
-            
-            # 处理流式响应
-            for chunk in deal_response(response):
-                if chunk["choices"][0]["delta"].get("reasoning_content"):
-                    reasoning_content += chunk["choices"][0]["delta"]["reasoning_content"]
-                    if reasoning_content and len(reasoning_content) > 200 and reasoning_content.endswith("。"):
-                        reasoning_content = reasoning_content.replace("\n","\n> ")
-                        yield f"Reason: (思考)\n> \n{reasoning_content}\n\n"
-                        reasoning_content = ""
-                elif chunk["choices"][0]["delta"].get("content"):
-                    if reasoning_content:
-                        reasoning_content = reasoning_content.replace("\n","\n> ")
-                        yield f"Reason: (思考)\n> \n{reasoning_content}\n\n"
-                        reasoning_content = ""
-                    content += chunk["choices"][0]["delta"]["content"]
-
-
-            if content:
-                yield content
-                    
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            yield "error: " + str(e)
-        
-    yield from generate(messages)
-
-import re
-
-def ask_ai(message:'list[dict[str,str]]')->'list[str]':
+def ask_ai(message:'list[dict[str,str]]', ai_client)->'list[str]':
     pyi_doc = {}
     pyi_dir = os.path.dirname(__file__)
     for root, dirs, _ in os.walk(pyi_dir):
@@ -185,8 +106,10 @@ none
     message[-1]["content"] += sysmsg
 
     answer = ""
-    for res in siliconflow(message):
-        answer = res
+    for chunk in ai_client(message):
+        chunk = json.loads(chunk)
+        if chunk["choices"][0]["delta"].get("content"):
+            answer += chunk["choices"][0]["delta"]["content"]
     message[-1]["content"] = msg
     print("=======ask ai========")
     print(answer)
@@ -276,8 +199,8 @@ def maybe_use_example(answer:'str')->'str':
 
 
 
-def rule(message:'list[dict[str,str]]'):
-    func, example = ask_ai(message)
+def rule(message:'list[dict[str,str]]', ai_client = None):
+    func, example = ask_ai(message, ai_client)
     maybe_use = maybe_use_func(func)
     res = ""
     for a,b,_ in os.walk(os.path.dirname(__file__)):
@@ -294,5 +217,4 @@ def rule(message:'list[dict[str,str]]'):
     # print(res)
     return res
 
-# if __name__ == "__main__":
-#     rule()
+

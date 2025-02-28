@@ -16,7 +16,7 @@ TENCENT_API_KEY = os.getenv('TENCENT_API_KEY', '')
 DEEPSEEK_API_BASE = "https://api.deepseek.com"
 SILICONFLOW_API_BASE = "https://api.siliconflow.com/v1/chat/completions"  # 修改硅基流动API基础URL
 TENCENT_API_BASE = "https://api.lkeap.cloud.tencent.com/v1"
-
+GPT_PROXY_API_BASE = "https://www.riddler.icu"
 
 def deepseek(messages:'list[dict[str, str]]', model:str = "deepseek-chat"):
     deepseek_client = openai.OpenAI(
@@ -37,8 +37,7 @@ def deepseek(messages:'list[dict[str, str]]', model:str = "deepseek-chat"):
             )
             
             for chunk in response:
-                chunk = chunk.to_dict()
-                yield json.dumps(chunk)
+                yield chunk.to_json()
 
         except Exception as e:
             import traceback
@@ -49,13 +48,10 @@ def deepseek(messages:'list[dict[str, str]]', model:str = "deepseek-chat"):
 
 
 def gpt(messages:'list[dict[str, str]]',model:str="gpt-4o-mini"):
-    import httpx
-    proxy = "http://127.0.0.1:7078"
-    http_client = httpx.Client(proxies={"http://": proxy, "https://": proxy})
 
     openai_client = openai.OpenAI(
         api_key=OPENAI_API_KEY,
-        http_client=http_client
+        base_url=GPT_PROXY_API_BASE
     )
     
     # 定义流式响应生成器
@@ -70,13 +66,13 @@ def gpt(messages:'list[dict[str, str]]',model:str="gpt-4o-mini"):
             )
             
             for chunk in response:
-                chunk = chunk.to_dict()
-                yield json.dumps(chunk)
+                yield chunk.to_json()
 
         except Exception as e:
             import traceback
             traceback.print_exc()
-            yield "error: " + str(e)
+            print("error", str(e))
+            yield f"data: error:{str(e)}"
         
     yield from generate(messages)
 
@@ -101,8 +97,7 @@ def tencent(messages:'list[dict[str, str]]', model:str = "deepseek-v3"):
             )
             
             for chunk in response:
-                chunk = chunk.to_dict()
-                yield json.dumps(chunk)
+                yield chunk.to_json()
 
         except Exception as e:
             import traceback
@@ -138,20 +133,20 @@ def siliconflow(messages:'list[dict[str, str]]',model:str = "deepseek-ai/DeepSee
                 stream=True
             )
             
-            def deal_response(resp:requests.Response):
+            def deal_response_to_json(resp:requests.Response):
                 for line in resp.iter_lines():
                     if line:
                         # 删除 "data: " 前缀并解析 JSON
                         line:str = line.decode('utf-8')
                         if line.startswith("data: "):
                             try:
-                                yield json.loads(line[6:])
+                                yield line[6:]
                             except json.JSONDecodeError:
                                 continue
             
             # 处理流式响应
-            for chunk in deal_response(response):
-                yield json.dumps(chunk)  
+            for chunk in deal_response_to_json(response):
+                yield chunk
 
         except Exception as e:
             import traceback
