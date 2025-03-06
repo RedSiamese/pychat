@@ -1,3 +1,14 @@
+"""
+
+    pycluster是pycluster2x中基础功能相关的模块，包含算法句柄类等, 通常通过 ```from pycluster2x import pycluster```引入。
+
+    pycluster中定义了模态枚举（pycluster.FACE,pycluster.BODY等）。
+    pycluster中定义了cluster_hdl算法句柄，通过配置表和能力集（支持哪些模态功能）进行构造，通过算法句柄才可以使用算法功能
+    pycluster中定义了创建算法句柄的默认配置default_cfg
+
+    关键词： 算法句柄  配置表
+    
+"""
 from __future__ import annotations
 import typing
 __all__ = ['BODY', 'FACE', 'INT_MAX', 'c_threadid', 'cluster_div_mem_error', 'cluster_hdl', 'cluster_invoke_error', 'cluster_license_error', 'cluster_logic_error', 'default_cfg', 'demo_version', 'detail_info', 'detail_info_viewer', 'lib_version', 'mdl_e', 'platform', 'sdk_version', 'this_platform']
@@ -11,28 +22,20 @@ class cluster_hdl:
                 例如：
                 ``` python
         
-                def to_str_dict(func):
-                    def wrapper() -> 'dict[str, str]':
-                        res : dict = func()
-                        return dict(map(lambda item: (item[0], str(item[1])), res.items()))
-                    return wrapper
-        
                 @to_str_dict
                 def cfg() -> dict:
                     return {
-                        "face_cfg_file" : "../model/face/fcl_v1.6",         # 人脸模型路径
-                        "body_cfg_file" : "../model/body/body.json",        # 人体模型路径
-                        "device_id" : 1,                                    # 设备id
-                        "device_type" : 2,                                  # 设备类型，2为gpu，1为cpu
-                        "save" : False,                                     # 是否保存离线合档中间结果
-                        "record" : True,                                    # 是否保存数据探针结果
-                        "body_centroid_num" : 4,                            # 人体质心数
-                        "face_feat_dim" : 256,                              # 人脸特征维度
-                        "body_feat_dim" : 256,                              # 人体特征维度
-                        "face_one_max_result_num" : 10,                     # 人脸oc最大结果数
-                        "body_one_max_result_num" : 10,                     # 人体oc最大结果数
-                        "feature" : "fp16",                                 # 人脸特征类型，fp32不填即可
-                        "proxy_sub_lower_bound" : 8                         # 实时底档筛选规则的底档数量
+                        "face_cfg_file" : "../model/face/fcl_v1.6",           # 人脸模型路径
+                        "body_cfg_file" : "../model/body/body.json",          # 人体模型路径
+                        "device_id" : "1",                                    # 设备id
+                        "device_type" : "2",                                  # 设备类型，2为gpu，1为cpu
+                        "body_centroid_num" : "4",                            # 人体质心数
+                        "face_feat_dim" : "256",                              # 人脸特征维度
+                        "body_feat_dim" : "256",                              # 人体特征维度
+                        "face_one_max_result_num" : "10",                     # 人脸oc最大结果数
+                        "body_one_max_result_num" : "10",                     # 人体oc最大结果数
+                        "feature" : "fp16",                                   # 人脸特征类型，fp32不填即可
+                        "proxy_sub_lower_bound" : "8"                         # 实时底档筛选规则的底档数量
                     }
         
                 alg_hdl = pycluster.cluster_hdl([pycluster.FACE, pycluster.BODY], cfg())
@@ -170,7 +173,7 @@ class platform:
         ...
 def c_threadid() -> int:
     """
-            默认配置表
+            python中获取c风格线程号
             例如：
             ``` python
     
@@ -180,11 +183,42 @@ def c_threadid() -> int:
     """
 def default_cfg() -> dict[str, str]:
     """
-            默认配置表
+            默认配置表, 字段和默认值为
+            ``` python
+            {
+                "device_type": "1",                         # 平台相关，cpu为1，gpu为2
+                "feature": "fp16",                          # 平台相关，cpu为fp32，gpu为fp16
+                "device_id": "0",                           # 平台相关，cpu版本或不支持多卡的版本无效
+                "face_feat_dim": "256",                     # 人脸特征维度
+                "face_feat_threshold": "0.92",              # 人脸batch阈值，通常0.92
+                "face_cluster_feat_threshold": "0.92",      # 人脸oc阈值，通常时空域内小合档0.92，跨时空域大合档0.95
+                "face_feat_topK": "3",                      # 针对人脸特征聚类的k近邻参数，通常填3
+                "face_one_max_result_num": "10",            # 人脸oc结果输出数量
+                "face_centroid_num": "4",                   # 人脸质心数量
+                "face_batch_center_threshold": "0.95",      # 人脸选取额外质心时和主质心的介值要求，通常填0.95
+                "body_feat_dim": "256",                     # 人体特征维度
+                "body_one_max_result_num": "10",            # 人体oc结果输出数量
+                "body_centroid_num": "4",                   # 人体质心数量
+                "body_batch_center_threshold": "0.95",      # 人体选取额外质心时和主质心的介值要求，通常填0.95
+                "body_feat_threshold": "0.92f",             # batch相似度阈值，通常0.92
+                "body_cluster_feat_threshold": "0.92f",     # oc相似度阈值，通常时空域内小合档0.92
+                "face_cfg_file": "-",                       # 人脸配置目录，填"-"标识跟随扩展包实际路径
+                "body_cfg_file": "-",                       # 人体配置目录，填"-"标识跟随扩展包实际路径
+                "record": "False",                          # 是否保存rid的中间流转过程用于调试
+                "uuid": "False",                            # 是否启用档案uuid
+                "data_cache": "./data_cache/",              # 档案集中所有抓拍来源的数据缓存地址
+                "base_cfg_file": "-",                       # 基础配置目录，填"-"标识跟随扩展包实际路径
+                "body_dossier_attr_len": "2",               # 人体属性长度
+                "face_dossier_attr_len": "2",               # 人脸属性长度
+                "face_lut_path": "-",                       # 人脸拉伸表目录，填"-"标识跟随扩展包实际路径
+                "body_lut_path": "-",                       # 人体拉伸表目录，填"-"标识跟随扩展包实际路径
+                "thread_num": "1"                           # 内部多线程数，"0"和"1"代表单线程
+            }
+            ```
+    
             例如：
             ``` python
     
-            from pycluster2x import pycluster, pydossier, pypic, pycache
             print(pycluster.default_cfg())
             ```
     """
@@ -220,7 +254,7 @@ def lib_version() -> tuple[int, str, str]:
     """
 def sdk_version() -> tuple[int, str, str]:
     """
-            获取聚类so库版本号
+            获取聚类sdk库版本号
             例如：
             ``` python
     

@@ -2,14 +2,19 @@ import re
 import requests
 import os
 import importlib.util
-import sys
+import sys, logging
 
 # 添加项目根目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import extensions.ai as ai
+def process_system(messages):
+    if not messages:
+        return messages
 
-def process_local_info(messages):
+    return [{"role": "system", "content": "用中文思考和回答，根据用户提供的文档和信息回答问题，不要擅自发挥和猜测，如果文档和已知信息不足以解决问题，请向用户提问或索要更多文档。"}] + messages
+
+
+def process_local_info(messages,ai_client):
     """处理本地info目录下的文件，支持多个@指令和自定义规则"""
     if not messages:
         return messages
@@ -44,14 +49,14 @@ def process_local_info(messages):
                     
                     # 调用规则函数
                     if hasattr(module, 'rule'):
-                        context = module.rule(messages, ai.tencent)
+                        context = module.rule(messages, ai_client)
                         if context:
                             system_messages.append(f"参考文档[{info_dir}]:\n\n{context}\n\n")
                     continue
             except Exception as e:
                 import traceback
                 traceback.print_exc()
-                print(f"Error loading rule from {rule_path}: {e}")
+                logging.error(f"Error loading rule from {rule_path}: {e}")
 
         # 如果没有规则文件或规则加载失败，使用默认处理方式
         all_content = []
@@ -67,7 +72,8 @@ def process_local_info(messages):
             system_messages.append(system_message)
     
     if system_messages:
-        messages[-1]['content'] = ''.join(system_messages) + messages[-1]['content']
+        messages = process_system(messages)
+        messages = [{'role': 'system', 'content': ''.join(system_messages)}] + messages
 
     return messages
 
@@ -99,7 +105,7 @@ def process_url(messages):
                 messages[-1]['content'] = system_message + messages[-1]['content']
                 
             except requests.RequestException as e:
-                print(f"Error fetching GitHub file: {e}")
+                logging.error(f"Error fetching GitHub file: {e}")
     
     return messages
 
@@ -118,21 +124,15 @@ def process_order(messages):
 
 
 
-def process_system(messages):
-    """处理消息截断，当遇到只包含连续破折号的消息时截断历史"""
+
+def process_messages(messages, ai_client):
     if not messages:
         return messages
 
-    return [{"role": "system", "content": "用中文思考和回答，尽可能根据用户提供的文档和信息回答问题，尽可能不要擅自发挥和猜测，如果文档和已知信息不足以解决问题，请像用户提问或索要更多文档。"}] + messages
-
-def process_messages(messages):
-    if not messages:
-        return messages
-
-    messages = process_system(messages)
-    messages = process_local_info(messages)
-    messages = process_url(messages)
-    messages = process_order(messages)
+    # messages = process_system(messages)
+    messages = process_local_info(messages,ai_client)
+    # messages = process_url(messages)
+    # messages = process_order(messages)
     
     return messages
 

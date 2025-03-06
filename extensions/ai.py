@@ -9,14 +9,50 @@ load_dotenv()  # 加载环境变量
 
 # 配置API密钥和基础URL
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
-DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
-SILICONFLOW_API_KEY = os.getenv('SILICONFLOW_API_KEY', '')  # 添加硅基流动API密钥
+SILICONFLOW_API_KEY = os.getenv('SILICONFLOW_API_KEY', '')
 TENCENT_API_KEY = os.getenv('TENCENT_API_KEY', '')
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
 
-DEEPSEEK_API_BASE = "https://api.deepseek.com"
-SILICONFLOW_API_BASE = "https://api.siliconflow.com/v1/chat/completions"  # 修改硅基流动API基础URL
+SILICONFLOW_API_BASE = "https://api.siliconflow.com/v1"
 TENCENT_API_BASE = "https://api.lkeap.cloud.tencent.com/v1"
 GPT_PROXY_API_BASE = "https://www.riddler.icu"
+OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
+
+AI_SERVER = {
+    "openai":(os.getenv('OPENAI_API_KEY', ''), None),
+    "siliconflow":(os.getenv('SILICONFLOW_API_KEY', ''), "https://api.siliconflow.com/v1"),
+    "tencent":(os.getenv('TENCENT_API_KEY', ''), "https://api.lkeap.cloud.tencent.com/v1"),
+    "openrouter":(os.getenv('OPENROUTER_API_KEY', ''), "https://openrouter.ai/api/v1"),
+    "riddler":(os.getenv('OPENAI_API_KEY', ''), "https://www.riddler.icu"),
+}
+
+def create_message(role = "assistant", content = None, reasoning_content = None, stop = None): 
+    return {
+    "id": "riddler-admin",
+    "choices": [
+        {
+            "delta": {
+                "content":content,
+                "reasoning_content": reasoning_content,
+                "role": role,
+                "refusal": None
+            },
+            "finish_reason": stop,
+            "index": 0,
+            "logprobs": None
+        }
+    ],
+    "created": 1740036135,
+    "model": "unknown",
+    "object": "chat.completion.chunk",
+    "service_tier": "default",
+    "system_fingerprint": "unknown"
+}
+
+
+def error(*args, **kargs):
+    yield "error: model select error"
+
 
 def deepseek(messages:'list[dict[str, str]]', model:str = "deepseek-chat"):
     deepseek_client = openai.OpenAI(
@@ -37,7 +73,7 @@ def deepseek(messages:'list[dict[str, str]]', model:str = "deepseek-chat"):
             )
             
             for chunk in response:
-                yield chunk.to_json()
+                yield json.dumps(chunk.to_dict())
 
         except Exception as e:
             import traceback
@@ -48,10 +84,13 @@ def deepseek(messages:'list[dict[str, str]]', model:str = "deepseek-chat"):
 
 
 def gpt(messages:'list[dict[str, str]]',model:str="gpt-4o-mini"):
+    import httpx
+    proxy = "http://127.0.0.1:7078"
+    http_client = httpx.Client(proxies={"http://": proxy, "https://": proxy})
 
     openai_client = openai.OpenAI(
         api_key=OPENAI_API_KEY,
-        base_url=GPT_PROXY_API_BASE
+        http_client=http_client
     )
     
     # 定义流式响应生成器
@@ -66,7 +105,7 @@ def gpt(messages:'list[dict[str, str]]',model:str="gpt-4o-mini"):
             )
             
             for chunk in response:
-                yield chunk.to_json()
+                yield json.dumps(chunk.to_dict())
 
         except Exception as e:
             import traceback
@@ -75,7 +114,6 @@ def gpt(messages:'list[dict[str, str]]',model:str="gpt-4o-mini"):
             yield f"data: error:{str(e)}"
         
     yield from generate(messages)
-
 
 
 def tencent(messages:'list[dict[str, str]]', model:str = "deepseek-v3"):
@@ -97,7 +135,7 @@ def tencent(messages:'list[dict[str, str]]', model:str = "deepseek-v3"):
             )
             
             for chunk in response:
-                yield chunk.to_json()
+                yield json.dumps(chunk.to_dict())
 
         except Exception as e:
             import traceback
@@ -107,46 +145,35 @@ def tencent(messages:'list[dict[str, str]]', model:str = "deepseek-v3"):
     yield from generate(messages)
 
 
+def openrouter(messages:'list[dict[str, str]]', model:str = "gpt-4o-mini"):
+    import httpx
+    proxy = "http://127.0.0.1:7078"
+    http_client = httpx.Client(proxies={"http://": proxy, "https://": proxy})
 
-def siliconflow(messages:'list[dict[str, str]]',model:str = "deepseek-ai/DeepSeek-V3"):
-    """使用硅基流动API处理对话"""
+    openrouter_client = openai.OpenAI(
+        api_key=OPENROUTER_API_KEY,
+        base_url=OPENROUTER_API_BASE,
+        http_client=http_client
+    )
     
-    headers = {
-        "Authorization": f"Bearer {SILICONFLOW_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
+    # 定义流式响应生成器
     def generate(messages):
         try:
-            data = {
-                "model": model,
-                "messages": messages,
-                "stream": True,
-                "temperature": 0.36
-            }
-            
-            # 使用requests发送流式请求
-            response = requests.post(
-                SILICONFLOW_API_BASE,
-                headers=headers,
-                json=data,
-                stream=True
+            # 使用处理后的消息调用OpenAI API
+            response = openrouter_client.chat.completions.create(
+                # model="deepseek-reasoner",
+                model=model,
+                messages=messages,
+                stream=True,  # 启用流式输出
+                temperature=0.36,
+                extra_body={'provider': {
+                        'order': [
+                            'OpenAI'
+                        ],'allow_fallbacks': False}} if model in ["openai/gpt-4o-mini", "gpt-4o-mini"] else {}
             )
             
-            def deal_response_to_json(resp:requests.Response):
-                for line in resp.iter_lines():
-                    if line:
-                        # 删除 "data: " 前缀并解析 JSON
-                        line:str = line.decode('utf-8')
-                        if line.startswith("data: "):
-                            try:
-                                yield line[6:]
-                            except json.JSONDecodeError:
-                                continue
-            
-            # 处理流式响应
-            for chunk in deal_response_to_json(response):
-                yield chunk
+            for chunk in response:
+                yield json.dumps(chunk.to_dict())
 
         except Exception as e:
             import traceback
@@ -154,4 +181,34 @@ def siliconflow(messages:'list[dict[str, str]]',model:str = "deepseek-ai/DeepSee
             yield "error: " + str(e)
         
     yield from generate(messages)
+
     
+def siliconflow(messages:'list[dict[str, str]]', model:str = "deepseek-ai/DeepSeek-V3"):
+    deepseek_client = openai.OpenAI(
+        api_key=SILICONFLOW_API_KEY,
+        base_url=SILICONFLOW_API_BASE
+    )
+    
+    # 定义流式响应生成器
+    def generate(messages):
+        try:
+            # 使用处理后的消息调用OpenAI API
+            response = deepseek_client.chat.completions.create(
+                # model="deepseek-reasoner",
+                model=model,
+                messages=messages,
+                stream=True,  # 启用流式输出
+                temperature=0.36
+            )
+            
+            for chunk in response:
+                yield json.dumps(chunk.to_dict())
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            yield "error: " + str(e)
+        
+    yield from generate(messages)
+
+

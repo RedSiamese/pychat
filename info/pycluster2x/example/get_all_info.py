@@ -7,7 +7,7 @@ pydossier.dossier.get_person_info, pypic.pic_info.__add__, person_num
 
 from pycluster2x import pydossier, pypic
 
-def get_info_and_batch(dos1: pydossier.dossier):
+def get_all_info(dos1: pydossier.dossier):
     combined_pic_info = pypic.pic_info()
     for pid in range(dos1.person_num()):
         combined_pic_info += dos1.get_person_info(pid)
