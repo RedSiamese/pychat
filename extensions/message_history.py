@@ -79,6 +79,40 @@ class ChatDatabase:
                 WHERE id IN (SELECT id FROM access_path)
             ''', {'node_id': node_id})
 
+    # 在 ChatDatabase 类中添加以下方法
+    def delete_nodes_by_prefix(self, parent_id, id_prefix):
+        """
+        删除指定父节点下所有 ID 以特定前缀开头的节点及其子节点
+        
+        Args:
+            parent_id (str): 父节点 ID
+            id_prefix (str): 要删除的节点 ID 前缀
+        
+        Returns:
+            int: 删除的节点数量
+        """
+        with self.conn:
+            cursor = self.conn.cursor()
+            # 首先找到所有匹配的直接子节点
+            cursor.execute('''
+                WITH RECURSIVE tree AS (
+                    -- 找到直接子节点
+                    SELECT id FROM messages 
+                    WHERE parent_id = ? AND id LIKE ? || '%'
+                    
+                    UNION ALL
+                    
+                    -- 递归找到所有子孙节点
+                    SELECT m.id
+                    FROM messages m
+                    JOIN tree t ON m.parent_id = t.id
+                )
+                DELETE FROM messages
+                WHERE id IN (SELECT id FROM tree)
+            ''', (parent_id, id_prefix))
+            
+            return cursor.rowcount
+
     def save_conversation(self, messages):
         """
         保存对话上下文并更新访问时间
@@ -94,6 +128,7 @@ class ChatDatabase:
                 if cursor.fetchone():
                     parent_id = messages[i]['id']
                     insert_start = i + 1
+                    self.delete_nodes_by_prefix(parent_id,"tmp:")
                     break
             else:  # 全新对话
                 insert_start = 0
@@ -122,7 +157,7 @@ class ChatDatabase:
         """
         获取完整对话链（从根节点开始）
         """
-        self._update_access_chain(branch_tail_id)  # 先更新时间戳
+        # self._update_access_chain(branch_tail_id)  # 先更新时间戳
         
         conversation = []
         with self.conn:
@@ -212,7 +247,8 @@ class ChatDatabase:
 
 # 使用示例
 if __name__ == '__main__':
-    db = ChatDatabase()
+    path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    db = ChatDatabase(path + "/.db/message_db/")
     
     # # 示例对话1（新树）
     # dialog1 = [
@@ -238,20 +274,20 @@ if __name__ == '__main__':
     # ]
     # db.save_conversation(dialog2)
     
-    # 获取对话分支
-    print("对话分支：")
-    for branch in db.get_conversation_branch('11'):
-        print(branch)
+    # # 获取对话分支
+    # print("对话分支：")
+    # for branch in db.get_conversation_branch('11'):
+    #     print(branch)
 
-    # 获取对话分支
-    print("对话分支：")
-    for branch in db.get_conversation_branch('44'):
-        print(branch)
+    # # 获取对话分支
+    # print("对话分支：")
+    # for branch in db.get_conversation_branch('44'):
+    #     print(branch)
 
-    # 获取对话分支
-    print("对话分支：")
-    for branch in db.get_conversation_branch('88'):
-        print(branch)
+    # # 获取对话分支
+    # print("对话分支：")
+    # for branch in db.get_conversation_branch('88'):
+    #     print(branch)
     
     # 获取完整对话树
     print("\n完整对话树：")

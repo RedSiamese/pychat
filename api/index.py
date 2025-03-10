@@ -5,6 +5,7 @@ import os
 import sys
 import json
 import logging
+import uuid
 
 # 引入注解类型
 from flask import Request
@@ -18,19 +19,22 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import extensions.message_processor as message_processor
 import extensions.message_history as message_history
-import extensions.ai as ai
+import ai.ai as ai
 
 CHAT_DICT = {
     # "deepseek-v3": lambda x:ai.deepseek(x, "deepseek-chat"), 
     # "deepseek-r1": lambda x:ai.deepseek(x, "deepseek-reasoner"), 
-    "gpt": ai.gpt,
-    "gpt-4o-mini": ai.gpt,
-    "siliconflow-v3": lambda x:ai.siliconflow(x, "deepseek-ai/DeepSeek-V3"),
-    "siliconflow-r1": lambda x:ai.siliconflow(x, "deepseek-ai/DeepSeek-R1"),
+    "gpt": lambda x,t:ai.gpt()(x, "gpt-4o-mini", t),
+    "gpt-4o-mini": lambda x,t:ai.gpt()(x, "gpt-4o-mini", t),
+    "siliconflow-v3": lambda x,t:ai.siliconflow()(x, "deepseek-ai/DeepSeek-V3", t),
+    "siliconflow-r1": lambda x,t:ai.siliconflow()(x, "deepseek-ai/DeepSeek-R1", t),
+    "siliconflow-r1-7B": lambda x,t:ai.siliconflow()(x, "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B", t),
     # "siliconflow-r1-32B": lambda x:ai.siliconflow(x, "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"),
-    "tencent-v3": lambda x:ai.tencent(x, "deepseek-v3"), 
-    "tencent-r1": lambda x:ai.tencent(x, "deepseek-r1"), 
-    "openrouter-4o-mini": lambda x:ai.openrouter(x, "gpt-4o-mini"), 
+    "tencent-v3": lambda x,t:ai.tencent()(x, "deepseek-v3", t), 
+    "tencent-r1": lambda x,t:ai.tencent()(x, "deepseek-r1", t), 
+    "openrouter-4o-mini": lambda x,t:ai.openrouter()(x, "openai/gpt-4o-mini", t), 
+    "openrouter-qwq-32b": lambda x,t:ai.openrouter()(x, "qwen/qwq-32b", t),
+    "riddler-4o-mini": lambda x,t:ai.riddler()(x, "gpt-4o-mini", t), 
 }
 
 # 定义系统信息常量
@@ -52,8 +56,9 @@ DEFAULT_INFO = """```
 pycluster2x聚档python扩展包api、代码生成相关的问题请添加“@pycluster2x ”，例如：@pycluster2x 怎么获取档案集中一个人的所有rid？
 聚档测试、运行，项目流程信息相关的问题请添加“@cluster ”，例如：@cluster 安徽多卡测试怎么跑？ 
 （@xxx 后面要带空格）
-聊天记录保存在服务器中，上下文默认大小为20，修改本地上下文大小无效。
-为规避10KB数据上传限制，本地上下文大小默认设置为2，用于和服务器聊天记录同步，和实际对话上下文无关。
+推荐使用chatbox
+使用chatbox时聊天记录保存在服务器中，上下文默认大小为20，修改本地上下文大小无效。
+为规避10KB数据上传限制，chatbox本地上下文大小默认设置为2，用于和服务器聊天记录同步，和实际对话上下文无关。
 超过10KB的单条大对话，可以分段上传，每段结尾添加"#continue"，最后一段不添加。
 暂不支持上传文件和网页链接。
 ```
@@ -118,7 +123,7 @@ def download_json():
     return response
 
 
-def chat_template(request:Request, ai_obj:Callable[[List[Dict[str,str]], str], Generator]) -> Generator:
+def chat_template(request:Request, ai_obj:Callable[[List[Dict[str,str]], str, float], Generator]) -> Generator:
     """
     除了接收请求外，接受一个ai组
     ai组接受message和model
@@ -128,6 +133,7 @@ def chat_template(request:Request, ai_obj:Callable[[List[Dict[str,str]], str], G
         def generate():
             yield f'data: {{"error" : {error_message}}}\n\n'
             yield "data: [DONE]\n\n"
+        return generate
 
     api_key = request.headers.get('Authorization')
     if not api_key:
@@ -135,12 +141,14 @@ def chat_template(request:Request, ai_obj:Callable[[List[Dict[str,str]], str], G
     if api_key.startswith('Bearer '):
         api_key = api_key[7:]
 
-    data = request.get_json()
+    data:dict = request.get_json()
     if not data or 'messages' not in data:
         return generate_error("Invalid request data")
 
     if 'model' not in data:
         return generate_error("Invalid request model")
+    
+    temperature = data.get('temperature', 0.32)
     
     model:str = data['model']
     messages:list[dict[str,str|int|None]] = data['messages']
@@ -154,13 +162,17 @@ def chat_template(request:Request, ai_obj:Callable[[List[Dict[str,str]], str], G
             messages[-1]['content'] = messages[-1]['content'][:-9]
             snippet = True
         
-        message_db = message_history.ChatDatabase("./.db/message_db/")
-        # 保存消息到数据库
-        message_db.save_conversation(messages)
-        # 从数据库中获取消息
-        messages = message_db.get_conversation_branch(messages[-1]["id"])
+        # 用数据库管理消息
+        message_db = None
+        if "id" in messages[-1]:
+            message_db = message_history.ChatDatabase("./.db/message_db/")
+            # 保存消息到数据库
+            message_db.save_conversation(messages)
+            # 从数据库中获取消息
+            messages = message_db.get_conversation_branch(messages[-1]["id"])
+
         # 处理消息
-        processed_messages = message_processor.process_messages(messages, lambda msgs: ai_obj(msgs, model))
+        processed_messages = message_processor.process_messages(messages, lambda msgs: ai_obj(msgs, model, temperature))
 
     def generate():
         try:
@@ -171,19 +183,33 @@ def chat_template(request:Request, ai_obj:Callable[[List[Dict[str,str]], str], G
                 yield f'data: {json.dumps(ai.create_message(stop="stop"))}\n\n'
             else:
                 if "Based on the chat history, give this conversation a name." in messages[-1]['content']:
-                    # chatbox 起名这种事情，交给gpt来做，速度快
-                    for msg in CHAT_DICT["gpt"](processed_messages):
-                        yield f"data: {msg}\n\n"
+                    # chatbox 起名这种事情，交给小模型来做，速度快
+                    for msg in CHAT_DICT["siliconflow-r1-7B"](processed_messages, temperature):
+                        yield f"data: {json.dumps(msg)}\n\n"
                 else:
                     # 使用处理后的消息调用OpenAI API
-                    for msg in ai_obj(processed_messages, model):
-                        yield f"data: {msg}\n\n"
+                    answer = ""
+                    for msg in ai_obj(processed_messages, model, temperature):
+                        if len(msg["choices"]) and "reasoning" in msg["choices"][0]["delta"] and "reasoning_content" not in msg["choices"][0]["delta"]:
+                            msg["choices"][0]["delta"]["reasoning_content"] = msg["choices"][0]["delta"]["reasoning"]
+                        # logging.info(msg)
+                        if message_db is not None and len(msg["choices"]) and "content" in msg["choices"][0]["delta"] and msg["choices"][0]["delta"]["content"]:
+                            answer += msg["choices"][0]["delta"]["content"]
+                        yield f"data: {json.dumps(msg)}\n\n"
+                    
+                    # 把ai的回复给数据库管理
+                    if message_db is not None:
+                        messages_his = messages
+                        messages_his += [{'id': f'tmp:{uuid.uuid1()}', 'role': 'assistant', 'content': answer}]
+                        # 保存消息到数据库
+                        message_db.save_conversation(messages_his)
         except Exception as e:
             import traceback
             traceback.print_exc()
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
         finally:
             yield "data: [DONE]\n\n"
+            logging.info("已完成用户响应")
     
     return generate
 
@@ -212,7 +238,7 @@ def ai_chat():
     try:
         # 返回流式响应
         return Response(
-            stream_with_context(chat_template(request, lambda message, model: CHAT_DICT[model](message))()),
+            stream_with_context(chat_template(request, lambda message, model, temperature: CHAT_DICT[model](message, temperature))()),
             content_type='text/event-stream',
             headers={
                 'Cache-Control': 'no-cache, no-transform',
@@ -232,6 +258,21 @@ def ai_chat():
 @app.route('/')
 def home():
     return 'Welcome to Calculator API'
+
+# 在现有导入语句下添加
+from flask import render_template
+
+# 在现有路由之前添加
+@app.route('/chat/tree')
+def chat_tree_page():
+    return render_template('chat_tree.html')
+
+@app.route('/api/chat/tree')
+def get_chat_tree():
+    message_db = message_history.ChatDatabase("./.db/message_db/")
+    tree_data = message_db.get_full_conversation_tree()
+    message_db.close()
+    return jsonify(tree_data)
 
 # 应用程序入口点
 if __name__ == '__main__':

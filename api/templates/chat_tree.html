@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>对话树可视化</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/5.1.1/marked.min.js"></script>
+    <style>
+        .node circle {
+            fill: #eaffe6;
+            stroke: rgb(16, 182, 1);
+            stroke-width: 3px;  /* 增加边框宽度 */
+            cursor: pointer;
+            r:24;
+        }
+        
+        .node text {
+            font: 12px sans-serif;
+            cursor: pointer;
+        }
+        
+        .link {
+            fill: none;
+            stroke: #ccc;
+            stroke-width: 1px;
+        }
+
+        .user circle {
+            fill: #e6f3ff;
+            stroke: steelblue;
+            r:8;
+        }
+
+        .assistant circle {
+            stroke: rgb(226, 128, 48);
+            fill: #fff8e9;
+            r:8;
+        }
+
+        .tooltip {
+            position: fixed;
+            padding: 15px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            pointer-events: none;
+            max-width: 400px;
+            max-height: 300px;
+            overflow-y: auto;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s, visibility 0.2s;
+            font-size: 14px;
+            line-height: 1.5;
+            visibility: hidden;    /* 默认隐藏 */
+        }
+        .tooltip.active {
+            opacity: 1;
+            pointer-events: auto;  /* 激活状态时响应鼠标事件 */
+            visibility: visible;
+        }
+
+        .tooltip p {
+            margin: 8px 0;
+        }
+
+        .tooltip pre {
+            background-color: #f6f8fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+
+        .tooltip code {
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            background-color: rgba(0,0,0,0.05);
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .role-label {
+            font-size: 10px;
+            fill: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="tree-container"></div>
+    <script>
+        // 配置marked选项
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            headerIds: false,
+            mangle: false
+        });
+
+        // 创建tooltip div
+        const tooltip = d3.select("body")
+            .append("div")
+            .attr("class", "tooltip");
+
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])  // 设置缩放范围：最小0.1倍，最大4倍
+            .on('zoom', handleZoom);
+
+        function handleZoom(e) {
+            svg.attr('transform', e.transform);
+        }
+
+        const treeData = {
+            name: "对话树",
+            children: []
+        };
+
+        const width = window.innerWidth - 40;
+        const height = window.innerHeight - 40;
+        const margin = {top: 20, right: 120, bottom: 20, left: 120};
+        
+        // 修改 svg 的创建代码，添加缩放支持
+        const svg = d3.select("#tree-container")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .call(zoom)  // 启用缩放功能
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+        // 在窗口大小改变时的处理函数中也要保持缩放功能
+        window.addEventListener('resize', () => {
+            d3.select("#tree-container svg")
+                .attr("width", window.innerWidth - 40)
+                .attr("height", window.innerHeight - 40)
+                .call(zoom);  // 重新启用缩放功能
+            
+            loadData().then(data => {
+                updateTree({
+                    children: data
+                });
+            });
+        });
+
+        let activeTooltip = null;
+        let tooltipTimer = null;
+
+        function showTooltip(event, content, nodeElement) {
+            // 清除之前的定时器
+            if (tooltipTimer) {
+                clearTimeout(tooltipTimer);
+            }
+            
+            const tooltipElement = tooltip.node();
+            const parsedContent = marked.parse(content);
+            const nodeBox = nodeElement.getBoundingClientRect();
+            
+            // 如果有活动的气泡，先将其隐藏
+            if (activeTooltip && activeTooltip !== nodeElement) {
+                hideTooltip();
+            }
+            
+            tooltip
+                .html(parsedContent)
+                .classed('active', true)
+                .style("opacity", 1)
+                .style("left", (nodeBox.right + 15) + "px")
+                .style("top", (nodeBox.top - 10) + "px")
+                .on("mouseleave", function() {
+                    // 鼠标离开气泡时启动延时隐藏
+                    tooltipTimer = setTimeout(() => {
+                        hideTooltip();
+                    }, 200);
+                })
+                .on("mouseenter", function() {
+                    // 鼠标进入气泡时清除隐藏定时器
+                    if (tooltipTimer) {
+                        clearTimeout(tooltipTimer);
+                    }
+                });
+
+            // 更新当前活动的气泡
+            activeTooltip = nodeElement;
+
+            // 确保tooltip不超出视窗
+            const tooltipBox = tooltipElement.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            if (tooltipBox.right > viewportWidth) {
+                tooltip.style("left", (nodeBox.left - tooltipBox.width - 10) + "px");
+            }
+            if (tooltipBox.bottom > viewportHeight) {
+                tooltip.style("top", (nodeBox.bottom - tooltipBox.height - 10) + "px");
+            }
+        }
+
+        function hideTooltip() {
+            tooltip
+                .classed('active', false)
+                .style("opacity", 0);
+            activeTooltip = null;
+        }
+
+        async function loadData() {
+            try {
+                const response = await fetch('/api/chat/tree');
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error loading data:', error);
+                return [];
+            }
+        }
+
+        function updateTree(data) {
+            const tree = d3.tree()
+                .size([height - margin.top - margin.bottom, width - margin.left - margin.right]);
+
+            const root = d3.hierarchy(data);
+            tree(root);
+
+            const link = svg.selectAll(".link")
+                .data(root.links())
+                .join("path")
+                .attr("class", "link")
+                .attr("d", d3.linkHorizontal()
+                    .x(d => d.y)
+                    .y(d => d.x));
+
+            const node = svg.selectAll(".node")
+                .data(root.descendants())
+                .join("g")
+                .attr("class", d => `node ${d.data.role || ""}`)
+                .attr("transform", d => `translate(${d.y},${d.x})`);
+
+            node.append("circle")
+                .attr("r", 8)
+                .on("mouseover", function(event, d) {
+                    const content = d.data.content || d.data.name;
+                    showTooltip(event, content, this);
+                })
+                .on("mouseout", function() {
+                    tooltipTimer = setTimeout(() => {
+                        hideTooltip();
+                    }, 200);
+                });
+
+
+            node.append("text")
+                .attr("dy", ".35em")
+                .attr("x", d => d.children ? -13 : 13)
+                .attr("text-anchor", d => d.children ? "end" : "start")
+                .text(d => {
+                    const content = d.data.content || d.data.name;
+                    return content.length > 5 ? content.substring(0, 5) + "..." : content;
+                });
+                // .on("mouseover", function(event, d) {
+                //     const content = d.data.content || d.data.name;
+                //     showTooltip(event, content);
+                // })
+                // .on("mouseout", function() {
+                //     tooltip.style("opacity", 0);
+                // });
+
+            // 添加角色标签
+            node.append("text")
+                .attr("class", "role-label")
+                .attr("dy", "-1em")
+                .attr("x", d => d.children ? -13 : 13)
+                .attr("text-anchor", d => d.children ? "end" : "start")
+                .text(d => d.data.role || "");
+        }
+
+        // 修改窗口大小改变时的处理
+        window.addEventListener('resize', () => {
+            svg.attr("width", window.innerWidth - 40)
+            .attr("height", window.innerHeight - 40);
+            loadData().then(data => {
+                updateTree({
+                    children: data
+                });
+            });
+        });
+        
+        // 初始加载
+        loadData().then(data => {
+            treeData.children = data;
+            updateTree(treeData);
+        });
+        
+    </script>
+</body>
+</html>
