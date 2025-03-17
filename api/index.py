@@ -6,10 +6,11 @@ import sys
 import json
 import logging
 import uuid
+import asyncio
 
 # 引入注解类型
 from flask import Request
-from typing import Callable,List,Dict,Generator
+from typing import Callable,List,Dict,Generator,AsyncGenerator
 
 
 logging.basicConfig(level=logging.INFO)
@@ -55,6 +56,7 @@ SYSTEM_INFO = {
 DEFAULT_INFO = """```
 pycluster2x聚档python扩展包api、代码生成相关的问题请添加“@pycluster2x ”，例如：@pycluster2x 怎么获取档案集中一个人的所有rid？
 聚档测试、运行，项目流程信息相关的问题请添加“@cluster ”，例如：@cluster 安徽多卡测试怎么跑？ 
+使用cork7相关问题，请“@cluster ”，例如：@cork7 怎么取"./data_cache/"中分区"0-0"的数据？ 
 （@xxx 后面要带空格）
 推荐使用chatbox
 使用chatbox时聊天记录保存在服务器中，上下文默认大小为20，修改本地上下文大小无效。
@@ -63,6 +65,29 @@ pycluster2x聚档python扩展包api、代码生成相关的问题请添加“@py
 暂不支持上传文件和网页链接。
 ```
 """
+
+# 自定义函数，将异步生成器转换为同步生成器
+def iter_over_async(async_gen):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    gen = async_gen.__aiter__()
+    try:
+        while True:
+            try:
+                value = loop.run_until_complete(gen.__anext__())
+                yield value
+            except StopAsyncIteration:
+                break
+    finally:
+        loop.close()
+
+def sync_wapper(async_gen:Callable[[None], AsyncGenerator[str, None]]) -> Callable[[None], Generator[str, None,None]]:
+    """
+    用于将异步生成器函数转换为同步生成器函数
+    """
+    def wrapper(*args, **kwargs)->Generator[str, None,None]:
+        return iter_over_async(async_gen(*args, **kwargs))
+    return wrapper
 
 
 # 初始化Flask应用
@@ -123,14 +148,15 @@ def download_json():
     return response
 
 
-def chat_template(request:Request, ai_obj:Callable[[List[Dict[str,str]], str, float], Generator]) -> Generator:
+def chat_template(request:Request, ai_obj:'Callable[[List[Dict[str,str]], str, float], Generator]') -> 'Callable[[None], Generator[str, None, None]]':
     """
     除了接收请求外，接受一个ai组
     ai组接受message和model
     ai组通过model区分具体处理方法，处理输入message得到输出
     """
     def generate_error(error_message:str):
-        def generate():
+        @sync_wapper
+        async def generate()->AsyncGenerator[str, None]:
             yield f'data: {{"error" : {error_message}}}\n\n'
             yield "data: [DONE]\n\n"
         return generate
@@ -171,38 +197,55 @@ def chat_template(request:Request, ai_obj:Callable[[List[Dict[str,str]], str, fl
             # 从数据库中获取消息
             messages = message_db.get_conversation_branch(messages[-1]["id"])
 
-        # 处理消息
-        processed_messages = message_processor.process_messages(messages, lambda msgs: ai_obj(msgs, model, temperature))
-
-    def generate():
+    @sync_wapper
+    async def generate()->AsyncGenerator[str, None]:
         try:
+            # 返回一段使用说明
             if len(messages)<3:
                 yield f'data: {json.dumps(ai.create_message(reasoning_content = DEFAULT_INFO))}\n\n'
+
+            # 对分分割消息进行简单回复，直接退出
             if snippet:
                 yield f'data: {json.dumps(ai.create_message(content ="OK"))}\n\n'
                 yield f'data: {json.dumps(ai.create_message(stop="stop"))}\n\n'
-            else:
-                if "Based on the chat history, give this conversation a name." in messages[-1]['content']:
-                    # chatbox 起名这种事情，交给小模型来做，速度快
-                    for msg in CHAT_DICT["siliconflow-r1-7B"](processed_messages, temperature):
-                        yield f"data: {json.dumps(msg)}\n\n"
-                else:
-                    # 使用处理后的消息调用OpenAI API
-                    answer = ""
-                    for msg in ai_obj(processed_messages, model, temperature):
-                        if len(msg["choices"]) and "reasoning" in msg["choices"][0]["delta"] and "reasoning_content" not in msg["choices"][0]["delta"]:
-                            msg["choices"][0]["delta"]["reasoning_content"] = msg["choices"][0]["delta"]["reasoning"]
-                        # logging.info(msg)
-                        if message_db is not None and len(msg["choices"]) and "content" in msg["choices"][0]["delta"] and msg["choices"][0]["delta"]["content"]:
-                            answer += msg["choices"][0]["delta"]["content"]
-                        yield f"data: {json.dumps(msg)}\n\n"
-                    
-                    # 把ai的回复给数据库管理
-                    if message_db is not None:
-                        messages_his = messages
-                        messages_his += [{'id': f'tmp:{uuid.uuid1()}', 'role': 'assistant', 'content': answer}]
-                        # 保存消息到数据库
-                        message_db.save_conversation(messages_his)
+                return
+            
+            # 起名
+            if "Based on the chat history, give this conversation a name." in messages[-1]['content']:
+                # chatbox 起名这种事情，交给小模型来做，速度快
+                # async for msg in CHAT_DICT["siliconflow-r1-7B"](processed_messages, temperature):
+                #     yield f"data: {json.dumps(msg)}\n\n"
+                yield f'data: {json.dumps(ai.create_message(content="Title"))}\n\n'
+                yield f'data: {json.dumps(ai.create_message(stop="stop"))}\n\n'
+                return
+
+            # 正文
+            ## 处理消息
+            processed_messages = await message_processor.process_messages(messages, lambda msgs: ai_obj(msgs, model, temperature))
+            answer = ""
+            async for msg in ai_obj(processed_messages, model, temperature):
+                # 一定程度上规避bug
+                cache = ""
+                if len(msg["choices"]) and "reasoning" in msg["choices"][0]["delta"] and "reasoning_content" not in msg["choices"][0]["delta"]:
+                    msg["choices"][0]["delta"]["reasoning_content"] = msg["choices"][0]["delta"]["reasoning"]
+                    if type(msg["choices"][0]["delta"]["reasoning_content"]) == str:
+                        cache += msg["choices"][0]["delta"]["reasoning_content"]
+                        if cache.endswith('\\') or cache.endswith('n'):
+                            continue
+                        cache = cache.replace("\\n", "\n").replace("n\n", "\n")
+                        msg["choices"][0]["delta"]["reasoning_content"] = cache
+                        cache = ''
+                # logging.info(msg)
+                if message_db is not None and len(msg["choices"]) and "content" in msg["choices"][0]["delta"] and msg["choices"][0]["delta"]["content"]:
+                    answer += msg["choices"][0]["delta"]["content"]
+                yield f"data: {json.dumps(msg)}\n\n"
+            
+            # 把ai的回复给数据库管理
+            if message_db is not None:
+                messages_his = messages
+                messages_his += [{'id': f'tmp:{uuid.uuid1()}', 'role': 'assistant', 'content': answer}]
+                # 保存消息到数据库
+                message_db.save_conversation(messages_his)
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -212,6 +255,7 @@ def chat_template(request:Request, ai_obj:Callable[[List[Dict[str,str]], str, fl
             logging.info("已完成用户响应")
     
     return generate
+
 
 
 # OpenRouter API路由
@@ -232,7 +276,7 @@ def openrouter_chat():
         return jsonify({'error': str(e)}), 500
 
 
-# ChatGPT API路由
+# 通用API路由
 @app.route('/api/ai/v1/chat/completions', methods=['POST']) 
 def ai_chat():
     try:

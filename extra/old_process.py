@@ -2,9 +2,9 @@
 使用老流程(大分区小分区逐级归并流程)和csv数据进行聚档
 大体流程为：
 1. 读取一个目录，遍历子目录，获取所有csv数据，构建一个分区数据列表，类型为list[list[str]]（例如[["./0-0.csv", "./0-1.csv", "./0-2.csv"], ["./1-0.csv", "./1-1.csv", "./1-2.csv"], ...]），第一层list表示大分区，第二层表示每个大分区的小分区抓拍集所包含的抓拍数据路径。
-2. 遍历每个大分区，将大分区中的每个小分区数据进行batch聚档操作，分别生成档案集，可以用线程池多线程处理。
-3. 进行完成后，分别将每个大分区的小分区聚档得到的档案集用oc接口进行合档，合档之后结合合档结果调用check_multi接口进行离线合档，生成每个大分区档案集。
-4. 将所有大分区档案集使用进行合档和离线合档操作。在每次做这个操作前先将人体模态档案隐藏，完成操作后将人体模态还原。生成最终档案
+2. 聚档: 遍历每个大分区，将大分区中的每个小分区数据进行batch聚档操作，分别生成档案集，可以用线程池多线程处理。
+3. 小oc: 进行完成后，分别将每个大分区的小分区聚档得到的档案集用oc接口进行合档，合档之后结合合档结果调用check_multi接口进行离线合档，生成每个大分区档案集。
+4. 大oc: 将所有大分区小oc生成的档案集使用进行合档和离线合档操作。在每次做这个操作前先将人体模态档案隐藏，完成操作后将人体模态还原。生成最终档案
 
 主要使用接口：
 pycluster.cluster_hdl
@@ -75,7 +75,7 @@ def main():
     # ##################################################################################
     # process
     # ##################################################################################
-
+    # 聚档部分
     def batch(partition:str, res_path:str):
         try:
             path = f"{res_path}/{partition}/"
@@ -101,6 +101,7 @@ def main():
                 f.write(f"{stack_info}\n")
             raise RuntimeError(f"partition {partition}: {err}")
 
+    # 小oc部分
     # 包含oc接口调用的子任务
     # batch_thread_pool = thread_pool(40)
     def one_day(big_partition_id:int, res_path:str):
@@ -132,6 +133,7 @@ def main():
                 dossier_tmp.save_small(path+"dossier_other")
             raise RuntimeError(f"partition {big_partition_id} part {part}: {err}")
         
+    # 大oc部分
     def all_data(res_path:str, big_partition_num:int):
         try:
             thp_run = thread_pool(oc_thread_num)
@@ -144,7 +146,7 @@ def main():
                 dossier_tmp_path = future.result()
                 dossier_tmp = pydossier.load_small(dossier_tmp_path, default_cfg)
                 oc_res = dossier_all.oc(dossier_tmp)
-                dossier_all.check_multi(dossier_tmp, oc_res, "self_check|ex_fuse_oc")
+                dossier_all.check_multi(oc_res, "self_check|ex_fuse_oc")
                 dossier_all.shadow()
                 # dossier_all.save(f"{res_path}/all0_{i}/")
             dossier_all.shadow_restore()

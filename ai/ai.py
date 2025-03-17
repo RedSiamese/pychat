@@ -43,12 +43,12 @@ def create_message(role = "assistant", content = None, reasoning_content = None,
 def proxy():
     import httpx
     proxy = "http://127.0.0.1:7078"
-    return httpx.Client(proxies={"http://": proxy, "https://": proxy})
+    return httpx.AsyncClient(proxies={"http://": proxy, "https://": proxy})
 
 
 class ai_chat_service:
     def __init__(self, key:str = None, url:str = None, http_client = None, extra_headers:'dict[str, str]|None' = None, extra_body:'dict[str, str|int|float|None|bool]|None' = None):
-        self.client = openai.OpenAI(
+        self.client = openai.AsyncOpenAI(
             api_key=key,
             base_url=url,
             http_client=http_client
@@ -57,13 +57,13 @@ class ai_chat_service:
         self.extra_body = extra_body
         
     # 定义流式响应生成器
-    def __call__(self, messages, model, temperature = 0.32):
+    async def __call__(self, messages, model, temperature = 0.32):
         try:
             count = sum(map(lambda msg:len(msg["content"]), messages))
             logging.info(f"上下文长度：{count}")
 
             # 使用处理后的消息调用OpenAI API
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=model,
                 messages=messages,
                 stream=True,  # 启用流式输出
@@ -72,7 +72,7 @@ class ai_chat_service:
                 extra_body=self.extra_body
             )
             
-            for chunk in response:
+            async for chunk in response:
                 yield chunk.to_dict()
 
         except Exception as e:
@@ -80,6 +80,8 @@ class ai_chat_service:
             traceback.print_exc()
             print("error", str(e))
             yield {"error":str(e)}
+
+
         
 
 
@@ -88,16 +90,16 @@ def gpt() -> ai_chat_service:
     return ai_chat_service(*AI_SERVER["openai"], http_client = proxy())
 
 def tencent() -> ai_chat_service:
-    return ai_chat_service(*AI_SERVER["tencent"], http_client = proxy())
+    return ai_chat_service(*AI_SERVER["tencent"])
 
 def openrouter() -> ai_chat_service:
     return ai_chat_service(*AI_SERVER["openrouter"], http_client = proxy())
 
 def siliconflow() -> ai_chat_service:
-    return ai_chat_service(*AI_SERVER["siliconflow"], http_client = proxy())
+    return ai_chat_service(*AI_SERVER["siliconflow"])
 
 def riddler() -> ai_chat_service:
-    return ai_chat_service(*AI_SERVER["riddler"], http_client = proxy())
+    return ai_chat_service(*AI_SERVER["riddler"])
 
 
 
